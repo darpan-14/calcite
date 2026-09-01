@@ -236,6 +236,11 @@ public class CoreRules {
       ReduceExpressionsRule.CalcReduceExpressionsRule.CalcReduceExpressionsRuleConfig.DEFAULT
           .toRule();
 
+  /** Rule that rewrites a {@link LogicalCalc} condition using exact function
+   * preimages. */
+  public static final PreimageRules.CalcPreimageRule CALC_PREIMAGE =
+      PreimageRules.CalcPreimageRule.CalcPreimageRuleConfig.DEFAULT.toRule();
+
   /** Rule that converts a {@link Calc} to a {@link Project} and
    * {@link Filter}. */
   public static final CalcSplitRule CALC_SPLIT =
@@ -373,6 +378,11 @@ public class CoreRules {
       FILTER_REDUCE_EXPRESSIONS =
       ReduceExpressionsRule.FilterReduceExpressionsRule.FilterReduceExpressionsRuleConfig.DEFAULT
           .toRule();
+
+  /** Rule that rewrites a {@link LogicalFilter} condition using exact function
+   * preimages. */
+  public static final PreimageRules.FilterPreimageRule FILTER_PREIMAGE =
+      PreimageRules.FilterPreimageRule.FilterPreimageRuleConfig.DEFAULT.toRule();
 
   /** Rule that flattens an {@link Intersect} on an {@code Intersect}
    * into a single {@code Intersect}. */

@@ -41,6 +41,7 @@
 - title: Reference
   docs:
   - reference
+  - preimage
   - model
   - howto
 

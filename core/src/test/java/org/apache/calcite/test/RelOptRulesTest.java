@@ -88,6 +88,7 @@ import org.apache.calcite.rel.rules.LoptOptimizeJoinRule;
 import org.apache.calcite.rel.rules.MeasureRules;
 import org.apache.calcite.rel.rules.MultiJoin;
 import org.apache.calcite.rel.rules.MultiJoinOptimizeBushyRule;
+import org.apache.calcite.rel.rules.PreimageRules;
 import org.apache.calcite.rel.rules.ProjectCorrelateTransposeRule;
 import org.apache.calcite.rel.rules.ProjectFilterTransposeRule;
 import org.apache.calcite.rel.rules.ProjectJoinTransposeRule;
@@ -107,6 +108,7 @@ import org.apache.calcite.rel.rules.ValuesReduceRule;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeSystemImpl;
+import org.apache.calcite.rex.BisectionPreimageProvider;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexCorrelVariable;
@@ -10108,6 +10110,96 @@ class RelOptRulesTest extends RelOptTestBase {
     sql(sql).withRule(DateRangeRules.FILTER_INSTANCE)
         .withContext(c -> Contexts.of(CalciteConnectionConfig.DEFAULT, c))
         .check();
+  }
+
+  @Test void testFilterPreimageLosslessCast() {
+    final String sql = "select * from emp\n"
+        + "where cast(empno as bigint) < 100";
+    sql(sql).withRule(CoreRules.FILTER_PREIMAGE).check();
+  }
+
+  @Test void testFilterPreimageNullableLosslessCast() {
+    final String sql = "select * from empnullables\n"
+        + "where cast(comm as bigint) >= 100";
+    sql(sql).withRule(CoreRules.FILTER_PREIMAGE).check();
+  }
+
+  @Test void testFilterPreimageInList() {
+    final String sql = "select * from emp\n"
+        + "where cast(empno as bigint) in (10, 20)";
+    sql(sql).withRule(CoreRules.FILTER_PREIMAGE).check();
+  }
+
+  @Test void testFilterPreimageHonorsComplexityLimit() {
+    final String sql = "select * from emp\n"
+        + "where cast(empno as bigint) in (10, 20)";
+    final RelOptRule rule =
+        PreimageRules.FilterPreimageRule.FilterPreimageRuleConfig.DEFAULT
+            .withMaxSargComplexity(1)
+            .toRule();
+    sql(sql).withRule(rule).checkUnchanged();
+  }
+
+  @Test void testFilterPreimageRejectsInexactEndpoint() {
+    final String sql = "select * from emp\n"
+        + "where cast(empno as decimal(11, 1)) < decimal '3.7'";
+    sql(sql).withRule(CoreRules.FILTER_PREIMAGE).checkUnchanged();
+  }
+
+  @Test void testCalcPreimageLosslessCast() {
+    final HepProgram program = new HepProgramBuilder()
+        .addRuleInstance(CoreRules.FILTER_TO_CALC)
+        .addRuleInstance(CoreRules.CALC_PREIMAGE)
+        .build();
+    final String sql = "select * from emp\n"
+        + "where cast(empno as bigint) < 100";
+    sql(sql).withProgram(program).check();
+  }
+
+  @Test void testFilterPreimageExactNumericFloor() {
+    final String sql = "select * from emp\n"
+        + "where floor(sal) = 100";
+    sql(sql).withRule(CoreRules.FILTER_PREIMAGE).check();
+  }
+
+  @Test void testFilterPreimageUsesBisectionFallback() {
+    final RelOptRule rule =
+        PreimageRules.FilterPreimageRule.FilterPreimageRuleConfig.DEFAULT
+            .withPreimageProviders(
+                ImmutableList.of(BisectionPreimageProvider.INSTANCE))
+            .toRule();
+    final RelOptPlanner planner = new MockRelOptPlanner(Contexts.empty());
+    planner.setExecutor(new RexExecutorImpl(DataContexts.EMPTY));
+    final String sql = "select * from emp\n"
+        + "where floor(sal) = 100";
+    sql(sql)
+        .withFactory(t -> t.withPlannerFactory(context -> planner))
+        .withRule(rule)
+        .check();
+  }
+
+  @Test void testFilterPreimageExactNumericCeil() {
+    final String sql = "select * from emp\n"
+        + "where ceil(sal) = 100";
+    sql(sql).withRule(CoreRules.FILTER_PREIMAGE).check();
+  }
+
+  @Test void testFilterPreimageExactNumericFloorInList() {
+    final String sql = "select * from emp\n"
+        + "where floor(sal) in (100, 102)";
+    sql(sql).withRule(CoreRules.FILTER_PREIMAGE).check();
+  }
+
+  @Test void testFilterPreimageExactNumericFloorIdentity() {
+    final String sql = "select * from emp\n"
+        + "where floor(empno) = 100";
+    sql(sql).withRule(CoreRules.FILTER_PREIMAGE).check();
+  }
+
+  @Test void testFilterPreimageRejectsApproximateNumericFloor() {
+    final String sql = "select * from emp\n"
+        + "where floor(cast(sal as double)) = 1e2";
+    sql(sql).withRule(CoreRules.FILTER_PREIMAGE).checkUnchanged();
   }
 
   @Test void testFilterRemoveIsNotDistinctFromRule() {
