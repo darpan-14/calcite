@@ -10202,6 +10202,20 @@ class RelOptRulesTest extends RelOptTestBase {
     sql(sql).withRule(CoreRules.FILTER_PREIMAGE).checkUnchanged();
   }
 
+  @Test void testFilterPreimageExactNumericRound() {
+    final String sql = "select * from emp\n"
+        + "where round(sal) = 100";
+    sql(sql).withRule(CoreRules.FILTER_PREIMAGE).check();
+  }
+
+  @Test void testFilterPreimageUnaryMinusIntOverflowUnchanged() {
+    // -sal would overflow at INT MIN_VALUE, so neither the function handler
+    // nor bisection may rewrite it: the predicate is left unchanged.
+    final String sql = "select * from emp\n"
+        + "where -sal < 100";
+    sql(sql).withRule(CoreRules.FILTER_PREIMAGE).checkUnchanged();
+  }
+
   @Test void testFilterRemoveIsNotDistinctFromRule() {
     final Function<RelBuilder, RelNode> relFn = b -> b
         .scan("EMP")

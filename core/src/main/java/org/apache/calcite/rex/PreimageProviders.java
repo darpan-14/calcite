@@ -53,6 +53,7 @@ public final class PreimageProviders implements PreimageProvider {
       .register(SqlStdOperatorTable.ABS, AbsPreimageHandler.INSTANCE)
       .register(SqlStdOperatorTable.UNARY_MINUS,
           UnaryMinusPreimageHandler.INSTANCE)
+      .register(SqlStdOperatorTable.ROUND, RoundPreimageHandler.INSTANCE)
       .build();
 
   private final ImmutableMap<SqlOperator, PreimageHandler> handlers;

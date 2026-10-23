@@ -499,6 +499,147 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
         is(notNullValue()));
   }
 
+  // --- ROUND ----------------------------------------------------------------
+
+  @Test void testRoundPositiveEqualityIsClosedOpen() {
+    // ROUND(x) = 5  <=>  x IN [4.5, 5.5)  (half away from zero).
+    final RelDataType type = decimalType(5, 2, true);
+    final RexNode operand = input(type, 0);
+    final RexCall round =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.ROUND, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.UNKNOWN,
+            ImmutableRangeSet.of(Range.singleton(BigDecimal.valueOf(5))));
+
+    final Preimage<?> preimage =
+        requireNonNull(
+            PreimageProviders.DEFAULT.getPreimage(
+                round, resultDomain,
+                new PreimageContext(rexBuilder, executor, -1)));
+
+    assertThat(preimage.operand(), is(operand));
+    assertThat(preimage.sarg(),
+        is(
+            Sarg.of(RexUnknownAs.UNKNOWN,
+                ImmutableRangeSet.of(
+                    Range.closedOpen(new BigDecimal("4.50"),
+                        new BigDecimal("5.50"))))));
+  }
+
+  @Test void testRoundNegativeEqualityIsOpenClosed() {
+    // ROUND(x) = -5  <=>  x IN (-5.5, -4.5]  (half away from zero).
+    final RelDataType type = decimalType(5, 2, false);
+    final RexNode operand = input(type, 0);
+    final RexCall round =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.ROUND, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.FALSE,
+            ImmutableRangeSet.of(Range.singleton(BigDecimal.valueOf(-5))));
+
+    final Preimage<?> preimage =
+        requireNonNull(
+            PreimageProviders.DEFAULT.getPreimage(
+                round, resultDomain,
+                new PreimageContext(rexBuilder, executor, -1)));
+
+    assertThat(preimage.sarg(),
+        is(
+            Sarg.of(RexUnknownAs.FALSE,
+                ImmutableRangeSet.of(
+                    Range.openClosed(new BigDecimal("-5.50"),
+                        new BigDecimal("-4.50"))))));
+  }
+
+  @Test void testRoundZeroCrossingRange() {
+    // ROUND(x) IN [-1, 1]  <=>  x IN (-1.5, 1.5): the contiguous union of
+    // (-1.5,-0.5], (-0.5,0.5), [0.5,1.5).
+    final RelDataType type = decimalType(5, 2, false);
+    final RexNode operand = input(type, 0);
+    final RexCall round =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.ROUND, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.FALSE,
+            ImmutableRangeSet.of(
+                Range.closed(BigDecimal.valueOf(-1), BigDecimal.valueOf(1))));
+
+    final Preimage<?> preimage =
+        requireNonNull(
+            PreimageProviders.DEFAULT.getPreimage(
+                round, resultDomain,
+                new PreimageContext(rexBuilder, executor, -1)));
+
+    assertThat(preimage.sarg(),
+        is(
+            Sarg.of(RexUnknownAs.FALSE,
+                ImmutableRangeSet.of(
+                    Range.open(new BigDecimal("-1.50"),
+                        new BigDecimal("1.50"))))));
+  }
+
+  @Test void testRoundLessThanDropsHalf() {
+    // ROUND(x) < 1  <=>  ROUND(x) <= 0  <=>  x < 0.5.
+    final RelDataType type = decimalType(5, 2, false);
+    final RexNode operand = input(type, 0);
+    final RexCall round =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.ROUND, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.FALSE,
+            ImmutableRangeSet.of(Range.lessThan(BigDecimal.valueOf(1))));
+
+    final Preimage<?> preimage =
+        requireNonNull(
+            PreimageProviders.DEFAULT.getPreimage(
+                round, resultDomain,
+                new PreimageContext(rexBuilder, executor, -1)));
+
+    assertThat(preimage.sarg(),
+        is(
+            Sarg.of(RexUnknownAs.FALSE,
+                ImmutableRangeSet.of(
+                    Range.closedOpen(new BigDecimal("-999.99"),
+                        new BigDecimal("0.50"))))));
+  }
+
+  @Test void testRoundIntegralOperandIsIdentity() {
+    // ROUND of an already-integral operand is the identity.
+    final RexNode operand = input(tInt(true), 0);
+    final RexCall round =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.ROUND, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.UNKNOWN,
+            ImmutableRangeSet.of(Range.lessThan(BigDecimal.valueOf(100))));
+
+    final Preimage<?> preimage =
+        requireNonNull(
+            PreimageProviders.DEFAULT.getPreimage(
+                round, resultDomain,
+                new PreimageContext(rexBuilder, executor, -1)));
+
+    assertThat(preimage.operand(), is(operand));
+    assertThat(preimage.sarg(),
+        is(
+            Sarg.of(RexUnknownAs.UNKNOWN,
+                ImmutableRangeSet.of(
+                    Range.lessThan(BigDecimal.valueOf(100))))));
+  }
+
+  @Test void testRoundRejectsTwoArgumentForm() {
+    // ROUND(x, n) carries a scale argument and is out of scope.
+    final RexCall round =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.ROUND,
+            input(decimalType(5, 2, true), 0),
+            rexBuilder.makeExactLiteral(BigDecimal.ONE));
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.UNKNOWN,
+            ImmutableRangeSet.of(Range.singleton(BigDecimal.valueOf(5))));
+
+    assertThat(
+        PreimageProviders.DEFAULT.getPreimage(
+            round, resultDomain,
+            new PreimageContext(rexBuilder, executor, -1)),
+        nullValue());
+  }
+
   private RelDataType decimalType(int precision, int scale,
       boolean nullable) {
     final RelDataType type =

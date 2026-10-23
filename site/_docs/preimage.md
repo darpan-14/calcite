@@ -113,12 +113,19 @@ Providers should identify operators by identity rather than by name. They must
 be conservative when behavior depends on type families, precision, overflow,
 nullability, conformance, time zones, locales, or other execution semantics.
 
-Calcite has two built-in implementations. `FunctionPreimageProvider` contains
-closed-form derivations for functions where a formula is clearer or cheaper
-than evaluation. It currently handles lossless, order-preserving casts and
-unary `FLOOR` and `CEIL` over exact numeric types. The cast derivation rewrites
-a domain only when every finite endpoint is exactly representable in the source
-type. For example,
+Calcite has two built-in providers. `PreimageProviders` is a registry that maps
+each `SqlOperator` to a per-function `PreimageHandler`, which is the extension
+point for function-specific derivations. Adding preimage support for a new
+function is therefore a single `register` call &mdash; no central dispatch
+grows &mdash; and an application can start from `PreimageProviders.DEFAULT` and
+`toBuilder()` to add a handler for its own operator without patching Calcite.
+A handler is only invoked for calls to the operator it was registered for, and
+returns null for anything it cannot prove, so a later provider may try.
+
+The default registry handles lossless order-preserving casts, unary `FLOOR`
+and `CEIL`, unary `ROUND`, `ABS`, and unary minus, all over exact numeric
+types. The cast handler rewrites a domain only when every finite endpoint is
+exactly representable in the source type. For example,
 
 {% highlight sql %}
 CAST(smallint_column AS BIGINT) < 100
@@ -127,17 +134,29 @@ CAST(smallint_column AS BIGINT) < 100
 can become `smallint_column < 100`. A narrowing cast, or an endpoint that
 requires rounding or overflows the source type, is not rewritten.
 
-For an exact numeric operand, the point preimages of `FLOOR` and `CEIL` are
+For an exact numeric operand, the point preimages of `FLOOR`, `CEIL`, and
+`ROUND` (which rounds half away from zero) are
 
 {% highlight text %}
-preimage(FLOOR, k) = [k, k + 1)
-preimage(CEIL,  k) = (k - 1, k].
+preimage(FLOOR, k)      = [k, k + 1)
+preimage(CEIL,  k)      = (k - 1, k]
+preimage(ROUND, k)      = [k - 0.5, k + 0.5)   (k > 0)
+preimage(ROUND, k)      = (k - 0.5, k + 0.5]   (k < 0)
+preimage(ROUND, 0)      = (-0.5, 0.5).
 {% endhighlight %}
 
-The provider applies the corresponding boundary transformation to every range
-in the result `Sarg` and clips the result to the declared operand type. It does
-not handle approximate numeric types, whose NaN, infinity, and rounding
+Each handler applies the corresponding boundary transformation to every range
+in the result `Sarg` and clips the result to the declared operand type. None
+of them handles approximate numeric types, whose NaN, infinity, and rounding
 semantics require a separate proof.
+
+`ABS` and unary minus illustrate a case the handlers must reason about
+carefully: overflow. `ABS` is not monotonic &mdash; `ABS(x) = 5` has the
+two-point preimage `x IN (-5, 5)` &mdash; and both `ABS(min)` and `-min`
+overflow for a two's-complement integer type, where the declared domain is
+asymmetric. A `SEARCH` on the operand cannot reproduce that runtime error, so
+both handlers decline on asymmetric integer domains and apply only to the
+symmetric `DECIMAL` domains, where the rewrite is exact.
 
 `BisectionPreimageProvider` is the generic fallback for deterministic unary
 functions with known increasing or decreasing monotonicity over a finite exact
@@ -169,7 +188,7 @@ configured providers to conditions. They convert supported predicate forms to
 predicate only when a provider succeeds.
 
 Providers are tried in configured order and the first successful exact result
-wins. The default order is `FunctionPreimageProvider` followed by
+wins. The default order is the `PreimageProviders` registry followed by
 `BisectionPreimageProvider`: a closed-form derivation avoids planner-time
 execution, while bisection covers eligible functions without function-specific
 preimage code. Returning null means that a provider has declined the request,

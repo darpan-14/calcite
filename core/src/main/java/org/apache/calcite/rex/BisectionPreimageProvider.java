@@ -113,6 +113,19 @@ public final class BisectionPreimageProvider implements PreimageProvider {
     }
 
     final Probe probe = new Probe(call, operandDomain, context);
+
+    // Guard against an operator that DECLARES monotonicity but is not actually
+    // order-preserving over this domain, most importantly because it silently
+    // overflows. Java integer negation of MIN_VALUE wraps without error, so
+    // UNARY_MINUS over a two's-complement integer domain reports a value that
+    // breaks the declared direction. Verify the declared direction actually
+    // holds between the domain extremes; decline otherwise. (The monotonicity
+    // contract still has to be trusted BETWEEN the extremes -- see the class
+    // comment -- but this catches the common overflow case cheaply.)
+    if (!directionHoldsAtExtremes(operandDomain, increasing, probe)) {
+      return null;
+    }
+
     final TreeRangeSet<BigDecimal> preimage = TreeRangeSet.create();
     for (Range<BigDecimal> resultRange : resultRanges.asRanges()) {
       final @Nullable Range<BigDecimal> inputRange =
@@ -144,6 +157,27 @@ public final class BisectionPreimageProvider implements PreimageProvider {
           }
         };
     return call.getOperator().getMonotonicity(binding);
+  }
+
+  /**
+   * Returns whether the function respects its declared direction between the
+   * domain's minimum and maximum. A single-point domain is trivially
+   * consistent. Returns false (decline) if either extreme cannot be evaluated,
+   * or if {@code f(min)} and {@code f(max)} do not strictly obey the declared
+   * direction -- which is what a silent overflow at an extreme produces.
+   */
+  private static boolean directionHoldsAtExtremes(ExactNumericDomain domain,
+      boolean increasing, Probe probe) {
+    if (domain.minimum.compareTo(domain.maximum) >= 0) {
+      return true;
+    }
+    final @Nullable BigDecimal atMin = probe.at(domain.minimum);
+    final @Nullable BigDecimal atMax = probe.at(domain.maximum);
+    if (atMin == null || atMax == null) {
+      return false;
+    }
+    final int comparison = atMin.compareTo(atMax);
+    return increasing ? comparison < 0 : comparison > 0;
   }
 
   /** Returns the input interval whose function results occur in one result
@@ -317,6 +351,12 @@ public final class BisectionPreimageProvider implements PreimageProvider {
       }
       final int comparison = value.compareTo(boundary);
       return strict ? comparison > 0 : comparison >= 0;
+    }
+
+    /** Returns {@code f(coordinate)}, or null if it could not be evaluated to
+     * a non-null literal. */
+    @Nullable BigDecimal at(BigInteger coordinate) {
+      return value(coordinate);
     }
 
     private @Nullable BigDecimal value(BigInteger coordinate) {
