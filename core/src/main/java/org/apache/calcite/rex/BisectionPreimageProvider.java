@@ -18,16 +18,14 @@ package org.apache.calcite.rex;
 
 import org.apache.calcite.plan.Strong;
 import org.apache.calcite.rel.type.RelDataType;
+import org.apache.calcite.rex.PreimageNumerics.ExactNumericDomain;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
-import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.validate.SqlMonotonicity;
-import org.apache.calcite.util.RangeSets;
 import org.apache.calcite.util.Sarg;
 
 import com.google.common.collect.BoundType;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableRangeSet;
 import com.google.common.collect.Range;
 import com.google.common.collect.RangeSet;
 import com.google.common.collect.TreeRangeSet;
@@ -51,6 +49,19 @@ import java.util.Map;
  * domain. Every probe is evaluated by the planner's {@link RexExecutor}; the
  * provider declines the rewrite if no executor is available or a probe cannot
  * be reduced to a non-null literal.
+ *
+ * <p><b>Soundness depends on the operator's monotonicity declaration.</b>
+ * Calcite's {@code getMonotonicity} does not itself guarantee that the
+ * function is total or gap-free over the operand domain; an operator that
+ * declares {@code INCREASING} but is partial (errors or returns null on some
+ * in-range inputs) would make the derived boundaries wrong. The checks here
+ * reduce but do not eliminate that risk: {@link Strong.Policy#ANY} rules out
+ * operators whose null behavior is not purely null-in/null-out, and every
+ * probe must reduce to a non-null literal, so a gap that produces null or an
+ * error at a probed coordinate causes the provider to decline. A function that
+ * is silently non-monotonic between probes is still trusted. Register a
+ * closed-form {@link PreimageHandler} instead when a function's exact
+ * semantics are known.
  */
 public final class BisectionPreimageProvider implements PreimageProvider {
   /** Default bisection provider. */
@@ -82,7 +93,7 @@ public final class BisectionPreimageProvider implements PreimageProvider {
       return null;
     }
 
-    final RangeSet<BigDecimal> resultRanges = decimalRanges(resultDomain);
+    final RangeSet<BigDecimal> resultRanges = PreimageNumerics.decimalRanges(resultDomain);
     if (resultRanges == null) {
       return null;
     }
@@ -114,11 +125,9 @@ public final class BisectionPreimageProvider implements PreimageProvider {
       }
     }
 
-    final Range<BigDecimal> finiteDomain = operandDomain.range();
     final RangeSet<BigDecimal> normalized =
-        preimage.equals(ImmutableRangeSet.of(finiteDomain))
-            ? RangeSets.rangeSetAll()
-            : preimage;
+        PreimageNumerics.normalizeToOperandDomain(preimage,
+            operandDomain.range());
     return new Preimage<>(operand, Sarg.of(resultDomain.nullAs, normalized));
   }
 
@@ -285,20 +294,6 @@ public final class BisectionPreimageProvider implements PreimageProvider {
     return lower.add(upper.subtract(lower).shiftRight(1));
   }
 
-  @SuppressWarnings({"rawtypes", "unchecked"})
-  private static @Nullable RangeSet<BigDecimal> decimalRanges(
-      Sarg<?> domain) {
-    for (Object rangeObject : domain.rangeSet.asRanges()) {
-      final Range<?> range = (Range<?>) rangeObject;
-      if (range.hasLowerBound()
-          && !(range.lowerEndpoint() instanceof BigDecimal)
-          || range.hasUpperBound()
-          && !(range.upperEndpoint() instanceof BigDecimal)) {
-        return null;
-      }
-    }
-    return (RangeSet) domain.rangeSet;
-  }
 
   /** Evaluates and caches the function at bisection coordinates. */
   private static class Probe {
@@ -369,44 +364,4 @@ public final class BisectionPreimageProvider implements PreimageProvider {
     }
   }
 
-  /** Finite exact-numeric domain represented by consecutive integers. */
-  private static class ExactNumericDomain {
-    final RelDataType type;
-    final int scale;
-    final BigInteger minimum;
-    final BigInteger maximum;
-
-    ExactNumericDomain(RelDataType type, int scale, BigInteger minimum,
-        BigInteger maximum) {
-      this.type = type;
-      this.scale = scale;
-      this.minimum = minimum;
-      this.maximum = maximum;
-    }
-
-    static @Nullable ExactNumericDomain of(RelDataType type) {
-      if (SqlTypeUtil.isIntType(type)) {
-        final BigInteger minimum = SqlTypeUtil.integerBound(type, false);
-        final BigInteger maximum = SqlTypeUtil.integerBound(type, true);
-        return minimum == null || maximum == null ? null
-            : new ExactNumericDomain(type, 0, minimum, maximum);
-      }
-      if (type.getSqlTypeName() != SqlTypeName.DECIMAL
-          || type.getPrecision() <= 0 || type.getScale() < 0) {
-        return null;
-      }
-      final BigInteger maximum =
-          BigInteger.TEN.pow(type.getPrecision()).subtract(BigInteger.ONE);
-      return new ExactNumericDomain(type, type.getScale(), maximum.negate(),
-          maximum);
-    }
-
-    BigDecimal value(BigInteger coordinate) {
-      return new BigDecimal(coordinate, scale);
-    }
-
-    Range<BigDecimal> range() {
-      return Range.closed(value(minimum), value(maximum));
-    }
-  }
 }

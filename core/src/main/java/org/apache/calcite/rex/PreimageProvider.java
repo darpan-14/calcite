@@ -32,7 +32,7 @@ import org.checkerframework.checker.nullness.qual.Nullable;
  * application makes progress. A provider returns null when it cannot prove
  * the equivalence.
  *
- * @see FunctionPreimageProvider
+ * @see PreimageProviders
  * @see BisectionPreimageProvider
  */
 @FunctionalInterface

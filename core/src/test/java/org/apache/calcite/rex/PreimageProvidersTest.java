@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -44,7 +45,7 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
   @Test void testDefaultProviderOrder() {
     assertThat(PreimageRules.FilterPreimageRule.FilterPreimageRuleConfig.DEFAULT
         .preimageProviders(), hasSize(2));
-    assertSame(FunctionPreimageProvider.INSTANCE,
+    assertSame(PreimageProviders.DEFAULT,
         PreimageRules.FilterPreimageRule.FilterPreimageRuleConfig.DEFAULT
             .preimageProviders().get(0));
     assertSame(BisectionPreimageProvider.INSTANCE,
@@ -62,11 +63,11 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
 
     final Preimage<?> preimage =
         requireNonNull(
-            FunctionPreimageProvider.INSTANCE.getPreimage(
+            PreimageProviders.DEFAULT.getPreimage(
             cast, resultDomain, new PreimageContext(rexBuilder, executor, -1)));
 
-    assertThat(preimage.operand, is(operand));
-    assertThat(preimage.sarg,
+    assertThat(preimage.operand(), is(operand));
+    assertThat(preimage.sarg(),
         is(
             Sarg.of(RexUnknownAs.TRUE,
             ImmutableRangeSet.of(
@@ -82,7 +83,7 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
                 Range.atLeast(BigDecimal.valueOf(40_000))));
 
     assertThat(
-        FunctionPreimageProvider.INSTANCE.getPreimage(
+        PreimageProviders.DEFAULT.getPreimage(
         cast, resultDomain, new PreimageContext(rexBuilder, executor, -1)),
         nullValue());
   }
@@ -99,7 +100,7 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
                 Range.lessThan(new BigDecimal("3.7"))));
 
     assertThat(
-        FunctionPreimageProvider.INSTANCE.getPreimage(
+        PreimageProviders.DEFAULT.getPreimage(
         cast, resultDomain, new PreimageContext(rexBuilder, executor, -1)),
         nullValue());
   }
@@ -113,7 +114,7 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
             ImmutableRangeSet.of(Range.singleton(BigDecimal.ONE)));
 
     assertThat(
-        FunctionPreimageProvider.INSTANCE.getPreimage(
+        PreimageProviders.DEFAULT.getPreimage(
         cast, resultDomain, new PreimageContext(rexBuilder, executor, -1)),
         nullValue());
   }
@@ -129,12 +130,12 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
 
     final Preimage<?> preimage =
         requireNonNull(
-            FunctionPreimageProvider.INSTANCE.getPreimage(
+            PreimageProviders.DEFAULT.getPreimage(
                 floor, resultDomain,
                 new PreimageContext(rexBuilder, executor, -1)));
 
-    assertThat(preimage.operand, is(operand));
-    assertThat(preimage.sarg,
+    assertThat(preimage.operand(), is(operand));
+    assertThat(preimage.sarg(),
         is(
             Sarg.of(RexUnknownAs.UNKNOWN,
             ImmutableRangeSet.of(
@@ -153,12 +154,12 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
 
     final Preimage<?> preimage =
         requireNonNull(
-            FunctionPreimageProvider.INSTANCE.getPreimage(
+            PreimageProviders.DEFAULT.getPreimage(
                 ceil, resultDomain,
                 new PreimageContext(rexBuilder, executor, -1)));
 
-    assertThat(preimage.operand, is(operand));
-    assertThat(preimage.sarg,
+    assertThat(preimage.operand(), is(operand));
+    assertThat(preimage.sarg(),
         is(
             Sarg.of(RexUnknownAs.TRUE,
             ImmutableRangeSet.of(
@@ -179,11 +180,11 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
 
     final Preimage<?> preimage =
         requireNonNull(
-            FunctionPreimageProvider.INSTANCE.getPreimage(
+            PreimageProviders.DEFAULT.getPreimage(
                 floor, resultDomain,
                 new PreimageContext(rexBuilder, executor, -1)));
 
-    assertThat(preimage.sarg,
+    assertThat(preimage.sarg(),
         is(
             Sarg.of(RexUnknownAs.FALSE,
             ImmutableRangeSet.of(
@@ -204,11 +205,11 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
 
     final Preimage<?> preimage =
         requireNonNull(
-            FunctionPreimageProvider.INSTANCE.getPreimage(
+            PreimageProviders.DEFAULT.getPreimage(
                 ceil, resultDomain,
                 new PreimageContext(rexBuilder, executor, -1)));
 
-    assertThat(preimage.sarg,
+    assertThat(preimage.sarg(),
         is(
             Sarg.of(RexUnknownAs.FALSE,
             ImmutableRangeSet.of(
@@ -227,11 +228,11 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
 
     final Preimage<?> preimage =
         requireNonNull(
-            FunctionPreimageProvider.INSTANCE.getPreimage(
+            PreimageProviders.DEFAULT.getPreimage(
                 floor, resultDomain,
                 new PreimageContext(rexBuilder, executor, -1)));
 
-    assertThat(preimage.sarg,
+    assertThat(preimage.sarg(),
         is(
             Sarg.of(RexUnknownAs.UNKNOWN,
             ImmutableRangeSet.<BigDecimal>of())));
@@ -247,11 +248,11 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
 
     final Preimage<?> preimage =
         requireNonNull(
-            FunctionPreimageProvider.INSTANCE.getPreimage(
+            PreimageProviders.DEFAULT.getPreimage(
                 floor, resultDomain,
                 new PreimageContext(rexBuilder, executor, -1)));
 
-    assertThat(preimage.sarg,
+    assertThat(preimage.sarg(),
         is(
             Sarg.of(RexUnknownAs.FALSE,
             RangeSets.<BigDecimal>rangeSetAll())));
@@ -266,7 +267,7 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
             ImmutableRangeSet.of(Range.singleton(BigDecimal.ONE)));
 
     assertThat(
-        FunctionPreimageProvider.INSTANCE.getPreimage(
+        PreimageProviders.DEFAULT.getPreimage(
             floor, resultDomain,
             new PreimageContext(rexBuilder, executor, -1)),
         nullValue());
@@ -287,8 +288,8 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
                 floor, resultDomain,
                 new PreimageContext(rexBuilder, executor, -1)));
 
-    assertThat(preimage.operand, is(operand));
-    assertThat(preimage.sarg,
+    assertThat(preimage.operand(), is(operand));
+    assertThat(preimage.sarg(),
         is(
             Sarg.of(RexUnknownAs.UNKNOWN,
                 ImmutableRangeSet.of(
@@ -311,8 +312,8 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
                 negate, resultDomain,
                 new PreimageContext(rexBuilder, executor, -1)));
 
-    assertThat(preimage.operand, is(operand));
-    assertThat(preimage.sarg,
+    assertThat(preimage.operand(), is(operand));
+    assertThat(preimage.sarg(),
         is(
             Sarg.of(RexUnknownAs.FALSE,
                 ImmutableRangeSet.of(
@@ -342,6 +343,160 @@ class PreimageProvidersTest extends RexProgramBuilderBase {
 
     assertSame(context, context.unwrap(PreimageContext.class));
     assertSame(service, context.unwrap(TestService.class));
+  }
+
+  // --- ABS ------------------------------------------------------------------
+
+  @Test void testAbsEqualityIsSymmetricPair() {
+    // ABS(x) = 5  <=>  x IN (-5, 5). ABS is not monotonic, so this exercises
+    // the two-point (union of ranges) preimage.
+    final RelDataType type = decimalType(5, 0, true);
+    final RexNode operand = input(type, 0);
+    final RexCall abs =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.ABS, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.UNKNOWN,
+            ImmutableRangeSet.of(Range.singleton(BigDecimal.valueOf(5))));
+
+    final Preimage<?> preimage =
+        requireNonNull(
+            PreimageProviders.DEFAULT.getPreimage(
+                abs, resultDomain,
+                new PreimageContext(rexBuilder, executor, -1)));
+
+    assertThat(preimage.operand(), is(operand));
+    assertThat(preimage.sarg(),
+        is(
+            Sarg.of(RexUnknownAs.UNKNOWN,
+                ImmutableRangeSet.<BigDecimal>unionOf(
+                    com.google.common.collect.ImmutableList.of(
+                        Range.singleton(BigDecimal.valueOf(-5)),
+                        Range.singleton(BigDecimal.valueOf(5)))))));
+  }
+
+  @Test void testAbsUpperBoundIsClosedInterval() {
+    // ABS(x) <= 5  <=>  x IN [-5, 5].
+    final RelDataType type = decimalType(5, 0, false);
+    final RexNode operand = input(type, 0);
+    final RexCall abs =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.ABS, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.FALSE,
+            ImmutableRangeSet.of(Range.atMost(BigDecimal.valueOf(5))));
+
+    final Preimage<?> preimage =
+        requireNonNull(
+            PreimageProviders.DEFAULT.getPreimage(
+                abs, resultDomain,
+                new PreimageContext(rexBuilder, executor, -1)));
+
+    assertThat(preimage.sarg(),
+        is(
+            Sarg.of(RexUnknownAs.FALSE,
+                ImmutableRangeSet.of(
+                    Range.closed(BigDecimal.valueOf(-5),
+                        BigDecimal.valueOf(5))))));
+  }
+
+  @Test void testAbsPreservesNullPolicy() {
+    // The predicate's nullAs policy (here TRUE, as from IS NULL semantics) must
+    // carry through unchanged: a null operand behaves exactly as for ABS(x).
+    final RelDataType type = decimalType(5, 0, true);
+    final RexNode operand = input(type, 0);
+    final RexCall abs =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.ABS, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.TRUE,
+            ImmutableRangeSet.of(Range.atMost(BigDecimal.valueOf(5))));
+
+    final Preimage<?> preimage =
+        requireNonNull(
+            PreimageProviders.DEFAULT.getPreimage(
+                abs, resultDomain,
+                new PreimageContext(rexBuilder, executor, -1)));
+
+    assertThat(preimage.sarg().nullAs, is(RexUnknownAs.TRUE));
+  }
+
+  @Test void testAbsRejectsAsymmetricIntegerDomain() {
+    // ABS(min) overflows for two's-complement integers, and a SEARCH on the
+    // operand cannot reproduce that error, so the handler must decline.
+    final RexNode operand = input(tInt(true), 0);
+    final RexCall abs =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.ABS, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.UNKNOWN,
+            ImmutableRangeSet.of(Range.singleton(BigDecimal.valueOf(5))));
+
+    assertThat(
+        PreimageProviders.DEFAULT.getPreimage(
+            abs, resultDomain,
+            new PreimageContext(rexBuilder, executor, -1)),
+        nullValue());
+  }
+
+  // --- unary minus ----------------------------------------------------------
+
+  @Test void testUnaryMinusReflectsRange() {
+    // -x < 5  <=>  x > -5, i.e. (-inf, 5) reflects to (-5, +inf).
+    final RelDataType type = decimalType(5, 0, true);
+    final RexNode operand = input(type, 0);
+    final RexCall negate =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.UNARY_MINUS, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.UNKNOWN,
+            ImmutableRangeSet.of(Range.lessThan(BigDecimal.valueOf(5))));
+
+    final Preimage<?> preimage =
+        requireNonNull(
+            PreimageProviders.DEFAULT.getPreimage(
+                negate, resultDomain,
+                new PreimageContext(rexBuilder, executor, -1)));
+
+    assertThat(preimage.operand(), is(operand));
+    assertThat(preimage.sarg(),
+        is(
+            Sarg.of(RexUnknownAs.UNKNOWN,
+                ImmutableRangeSet.of(
+                    Range.openClosed(BigDecimal.valueOf(-5),
+                        BigDecimal.valueOf(99999))))));
+  }
+
+  @Test void testUnaryMinusRejectsAsymmetricIntegerDomain() {
+    // -min overflows for two's-complement integers: decline.
+    final RexNode operand = input(tBigInt(true), 0);
+    final RexCall negate =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.UNARY_MINUS, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.UNKNOWN,
+            ImmutableRangeSet.of(Range.singleton(BigDecimal.ONE)));
+
+    assertThat(
+        PreimageProviders.DEFAULT.getPreimage(
+            negate, resultDomain,
+            new PreimageContext(rexBuilder, executor, -1)),
+        nullValue());
+  }
+
+  @Test void testRegistryIsExtensible() {
+    // Adding a function is one register() call; the defaults are retained.
+    final PreimageProviders extended = PreimageProviders.DEFAULT.toBuilder()
+        .register(SqlStdOperatorTable.SQRT,
+            (call, domain, ctx) -> null)
+        .build();
+    // A default function still resolves through the extended registry.
+    final RelDataType type = decimalType(5, 0, true);
+    final RexNode operand = input(type, 0);
+    final RexCall negate =
+        (RexCall) rexBuilder.makeCall(SqlStdOperatorTable.UNARY_MINUS, operand);
+    final Sarg<BigDecimal> resultDomain =
+        Sarg.of(RexUnknownAs.UNKNOWN,
+            ImmutableRangeSet.of(Range.lessThan(BigDecimal.valueOf(5))));
+
+    assertThat(
+        extended.getPreimage(negate, resultDomain,
+            new PreimageContext(rexBuilder, executor, -1)),
+        is(notNullValue()));
   }
 
   private RelDataType decimalType(int precision, int scale,

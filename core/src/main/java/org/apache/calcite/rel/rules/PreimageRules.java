@@ -25,10 +25,10 @@ import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.logical.LogicalCalc;
 import org.apache.calcite.rel.logical.LogicalFilter;
 import org.apache.calcite.rex.BisectionPreimageProvider;
-import org.apache.calcite.rex.FunctionPreimageProvider;
 import org.apache.calcite.rex.Preimage;
 import org.apache.calcite.rex.PreimageContext;
 import org.apache.calcite.rex.PreimageProvider;
+import org.apache.calcite.rex.PreimageProviders;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.rex.RexCall;
 import org.apache.calcite.rex.RexExecutor;
@@ -192,7 +192,7 @@ public abstract class PreimageRules {
     /** Providers to try in order. The first provider that returns an exact
      * preimage wins. */
     @Value.Default default ImmutableList<PreimageProvider> preimageProviders() {
-      return ImmutableList.of(FunctionPreimageProvider.INSTANCE,
+      return ImmutableList.of(PreimageProviders.DEFAULT,
           BisectionPreimageProvider.INSTANCE);
     }
 
@@ -235,12 +235,12 @@ public abstract class PreimageRules {
         final Preimage<?> preimage =
             provider.getPreimage(search.call, search.sarg, context);
         if (preimage == null
-            || !search.call.getOperands().contains(preimage.operand)) {
+            || !search.call.getOperands().contains(preimage.operand())) {
           continue;
         }
         final int maxComplexity = context.maxSargComplexity();
         if (maxComplexity >= 0
-            && preimage.sarg.complexity() > maxComplexity) {
+            && preimage.sarg().complexity() > maxComplexity) {
           continue;
         }
         ++rewriteCount;
@@ -379,8 +379,8 @@ public abstract class PreimageRules {
   private static RexNode makeSearch(Search search, Preimage<?> preimage,
       RexBuilder rexBuilder) {
     return rexBuilder.makeCall(search.predicate.getParserPosition(),
-        SqlStdOperatorTable.SEARCH, preimage.operand,
-        rexBuilder.makeSearchArgumentLiteral(preimage.sarg,
-            preimage.operand.getType()));
+        SqlStdOperatorTable.SEARCH, preimage.operand(),
+        rexBuilder.makeSearchArgumentLiteral(preimage.sarg(),
+            preimage.operand().getType()));
   }
 }

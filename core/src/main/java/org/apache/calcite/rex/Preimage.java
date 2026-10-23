@@ -34,12 +34,22 @@ import static java.util.Objects.requireNonNull;
  */
 @API(since = "1.43.0", status = API.Status.EXPERIMENTAL)
 public final class Preimage<C extends Comparable<C>> {
-  public final RexNode operand;
-  public final Sarg<C> sarg;
+  private final RexNode operand;
+  private final Sarg<C> sarg;
 
   /** Creates a preimage. */
   public Preimage(RexNode operand, Sarg<C> sarg) {
     this.operand = requireNonNull(operand, "operand");
     this.sarg = requireNonNull(sarg, "sarg");
+  }
+
+  /** Returns the direct operand whose domain this preimage describes. */
+  public RexNode operand() {
+    return operand;
+  }
+
+  /** Returns the exact input domain for {@link #operand()}. */
+  public Sarg<C> sarg() {
+    return sarg;
   }
 }
