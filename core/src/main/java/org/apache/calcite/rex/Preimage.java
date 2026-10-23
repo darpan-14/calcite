@@ -26,8 +26,8 @@ import static java.util.Objects.requireNonNull;
  * Exact preimage of a result domain for a direct operand of a function call.
  *
  * <p>If {@code f(x)} is the original call and {@code D} is its result domain,
- * a preimage contains a direct {@link #operand} and a {@link #sarg} such that
- * {@code SEARCH(f(x), D)} and {@code SEARCH(operand, sarg)} have the same
+ * a preimage contains a direct {@link #operand()} and a {@link #sarg()} such
+ * that {@code SEARCH(f(x), D)} and {@code SEARCH(operand, sarg)} have the same
  * truth value for every input, including null inputs.
  *
  * @param <C> Value type of the operand domain
